@@ -1,33 +1,19 @@
-# 编译 typescript
-FROM public-cn-beijing.cr.volces.com/public/base:node-16-alpine as builder
+# 第一阶段：编译 TypeScript
+FROM node:18 AS builder
 
-WORKDIR /opt/application/
+WORKDIR /app
 
-COPY .  .
-
-USER root
-
-RUN npm install --registry=https://registry.npmmirror.com
+COPY package*.json ./
+RUN npm ci --only=production
+COPY src/ ./src/
+COPY tsconfig.json ./
 
 RUN npm run build
 
-# 生产环境镜像，不安装 devDependencies， 减少部署镜像大小
-FROM node:16-alpine
-
-WORKDIR /opt/application/
-
-COPY --from=builder /opt/application/dist ./dist
-
-COPY package.json ./
-
-COPY run.sh ./
-
-USER root
-
-RUN npm install --production --registry=https://registry.npmmirror.com
-
-RUN chmod -R 777 /opt/application/run.sh
-
-EXPOSE 8000
-
-CMD /opt/application/run.sh
+# 第二阶段：生产镜像
+FROM node:18-alpine
+WORKDIR /app
+COPY --from=builder /app/dist ./dist
+COPY --from=builder /app/node_modules ./node_modules
+EXPOSE 3000
+CMD ["node", "dist/index.js"] 
